@@ -12,6 +12,24 @@ from transformers import ViTForImageClassification
 
 from face_crop import crop_to_face  # face detection + crop
 
+
+import os
+import urllib.request
+
+MODEL_PATH = "best_vit_mask.pth"
+# TODO: Replace this with your actual direct download link from Step 1
+MODEL_URL = "https://huggingface.co/your-username/your-repo/resolve/main/best_vit_mask.pth"
+
+if not os.path.exists(MODEL_PATH):
+    print(f"Downloading model weights from {MODEL_URL}...")
+    try:
+        urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
+        print("Download complete successfully!")
+    except Exception as e:
+        print(f"Failed to download weights: {e}")
+        raise e
+
+
 # ── Configuration ─────────────────────────────────────────────────────────────
 _DIR        = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH  = os.path.join(_DIR, "best_vit_mask.pth")
