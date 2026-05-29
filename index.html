@@ -29,8 +29,19 @@
     <main class="max-w-5xl mx-auto w-full p-4 md:p-8 flex-grow grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
         
         <div class="bg-white p-6 rounded-2xl shadow-xs border border-slate-200">
-            <h2 class="text-lg font-semibold text-slate-800 mb-4">Upload Image</h2>
-            
+            <!-- Mode tabs -->
+            <div class="flex gap-1 mb-5 bg-slate-100 p-1 rounded-xl">
+                <button id="tab-upload" onclick="switchMode('upload')"
+                    class="flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-lg transition-all bg-white text-indigo-600 shadow-xs">
+                    <i class="fa-solid fa-cloud-arrow-up"></i> Upload
+                </button>
+                <button id="tab-camera" onclick="switchMode('camera')"
+                    class="flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-lg transition-all text-slate-500 hover:text-slate-700">
+                    <i class="fa-solid fa-video"></i> Live Camera
+                </button>
+            </div>
+
+            <div id="upload-panel">
             <div id="drop-zone" class="border-2 border-dashed border-slate-300 hover:border-indigo-500 rounded-xl p-8 text-center cursor-pointer transition-colors bg-slate-50/50 group">
                 <input type="file" id="file-input" class="hidden" accept="image/*">
                 <div class="text-slate-500 group-hover:text-indigo-600 transition-colors">
@@ -59,6 +70,25 @@
                     <i class="fa-solid fa-wand-magic-sparkles"></i> Run Classification
                 </button>
             </div>
+            </div><!-- /upload-panel -->
+
+            <div id="camera-panel" class="hidden">
+                <div class="relative rounded-xl overflow-hidden bg-slate-900 flex items-center justify-center" style="aspect-ratio:4/3">
+                    <video id="cam-video" autoplay playsinline muted class="w-full h-full object-cover rounded-xl"></video>
+                    <div id="cam-inactive" class="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
+                        <i class="fa-solid fa-video-slash text-4xl mb-2"></i>
+                        <p class="text-sm">Camera is off</p>
+                    </div>
+                    <div id="cam-indicator" class="hidden absolute top-3 right-3 flex items-center gap-1.5 bg-rose-600 text-white text-xs font-bold px-2.5 py-1 rounded-full">
+                        <span class="w-2 h-2 bg-white rounded-full animate-pulse"></span> LIVE
+                    </div>
+                </div>
+                <button id="cam-toggle-btn" onclick="toggleCamera()"
+                    class="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-4 rounded-xl transition-colors shadow-md shadow-indigo-100 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-circle-play"></i> Start Camera
+                </button>
+                <p class="text-xs text-slate-400 text-center mt-2">Captures &amp; classifies every 2 seconds</p>
+            </div>
         </div>
 
         <div class="bg-white p-6 rounded-2xl shadow-xs border border-slate-200 min-h-[350px] flex flex-col justify-between">
@@ -67,7 +97,7 @@
                 
                 <div id="state-empty" class="text-center py-12 text-slate-400">
                     <i class="fa-solid fa-chart-pie text-5xl mb-3 opacity-40"></i>
-                    <p class="text-sm">Upload and run an image to see predictions</p>
+                    <p id="state-empty-msg" class="text-sm">Upload and run an image to see predictions</p>
                 </div>
 
                 <div id="state-loading" class="hidden text-center py-12">
@@ -276,6 +306,100 @@
                 `;
                 listContainer.insertAdjacentHTML('beforeend', rowHtml);
             });
+        }
+        // ── Mode toggle ───────────────────────────────────────────────────────
+        let currentMode = 'upload';
+        let cameraStream = null;
+        let captureInterval = null;
+        const camVideo = document.getElementById('cam-video');
+
+        function switchMode(mode) {
+            if (mode === currentMode) return;
+            if (cameraStream) stopCamera();
+            currentMode = mode;
+
+            const tabUpload   = document.getElementById('tab-upload');
+            const tabCamera   = document.getElementById('tab-camera');
+            const uploadPanel = document.getElementById('upload-panel');
+            const cameraPanel = document.getElementById('camera-panel');
+
+            if (mode === 'upload') {
+                tabUpload.classList.add('bg-white', 'text-indigo-600', 'shadow-xs');
+                tabUpload.classList.remove('text-slate-500');
+                tabCamera.classList.remove('bg-white', 'text-indigo-600', 'shadow-xs');
+                tabCamera.classList.add('text-slate-500');
+                uploadPanel.classList.remove('hidden');
+                cameraPanel.classList.add('hidden');
+                document.getElementById('state-empty-msg').innerText = 'Upload and run an image to see predictions';
+            } else {
+                tabCamera.classList.add('bg-white', 'text-indigo-600', 'shadow-xs');
+                tabCamera.classList.remove('text-slate-500');
+                tabUpload.classList.remove('bg-white', 'text-indigo-600', 'shadow-xs');
+                tabUpload.classList.add('text-slate-500');
+                cameraPanel.classList.remove('hidden');
+                uploadPanel.classList.add('hidden');
+                document.getElementById('state-empty-msg').innerText = 'Start the camera to begin live detection';
+            }
+            resetResultsState();
+        }
+
+        // ── Camera ────────────────────────────────────────────────────────────
+        async function toggleCamera() {
+            if (cameraStream) stopCamera();
+            else await startCamera();
+        }
+
+        async function startCamera() {
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                camVideo.srcObject = cameraStream;
+                document.getElementById('cam-inactive').classList.add('hidden');
+                document.getElementById('cam-indicator').classList.remove('hidden');
+                const btn = document.getElementById('cam-toggle-btn');
+                btn.innerHTML = '<i class="fa-solid fa-circle-stop"></i> Stop Camera';
+                btn.classList.replace('bg-indigo-600', 'bg-rose-600');
+                btn.classList.replace('hover:bg-indigo-700', 'hover:bg-rose-700');
+                btn.classList.replace('shadow-indigo-100', 'shadow-rose-100');
+                captureAndPredict();
+                captureInterval = setInterval(captureAndPredict, 2000);
+            } catch (err) {
+                alert('Camera access denied or not available.\n' + err.message);
+            }
+        }
+
+        function stopCamera() {
+            if (captureInterval) { clearInterval(captureInterval); captureInterval = null; }
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(t => t.stop());
+                cameraStream = null;
+                camVideo.srcObject = null;
+            }
+            document.getElementById('cam-inactive').classList.remove('hidden');
+            document.getElementById('cam-indicator').classList.add('hidden');
+            const btn = document.getElementById('cam-toggle-btn');
+            btn.innerHTML = '<i class="fa-solid fa-circle-play"></i> Start Camera';
+            btn.classList.replace('bg-rose-600', 'bg-indigo-600');
+            btn.classList.replace('hover:bg-rose-700', 'hover:bg-indigo-700');
+            btn.classList.replace('shadow-rose-100', 'shadow-indigo-100');
+        }
+
+        async function captureAndPredict() {
+            if (!cameraStream || !camVideo.videoWidth) return;
+            const canvas = document.createElement('canvas');
+            canvas.width  = camVideo.videoWidth;
+            canvas.height = camVideo.videoHeight;
+            canvas.getContext('2d').drawImage(camVideo, 0, 0);
+            canvas.toBlob(async (blob) => {
+                const formData = new FormData();
+                formData.append('file', blob, 'frame.jpg');
+                try {
+                    const res = await fetch('http://localhost:5000/predict', { method: 'POST', body: formData });
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    displayResults(data.predictions, data.cropped_image);
+                    document.getElementById('inference-time').innerText = new Date().toLocaleTimeString();
+                } catch (_) { /* backend busy — skip frame */ }
+            }, 'image/jpeg', 0.85);
         }
     </script>
 </body>
