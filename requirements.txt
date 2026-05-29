@@ -1,3 +1,8 @@
 flask
+flask-cors
+Pillow
+torchvision
+transformers
+opencv-python-headless
 --find-links https://download.pytorch.org/whl/cpu/torch_stable.html
-torch--index-url https://download.pytorch.org/whl/cpu
+torch --index-url https://download.pytorch.org/whl/cpu
