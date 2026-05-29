@@ -20,8 +20,8 @@
                     <p class="text-xs text-slate-500">Neural Networks Final Project - CDTT</p>
                 </div>
             </div>
-            <span class="bg-emerald-50 text-emerald-700 text-xs font-semibold px-2.5 py-1 rounded-full border border-emerald-200">
-                Model Ready
+            <span id="status-badge" class="bg-slate-100 text-slate-500 text-xs font-semibold px-2.5 py-1 rounded-full border border-slate-200">
+                Connecting...
             </span>
         </div>
     </header>
@@ -307,6 +307,27 @@
                 listContainer.insertAdjacentHTML('beforeend', rowHtml);
             });
         }
+        // ── Backend health check ──────────────────────────────────────────────
+        const statusBadge = document.getElementById('status-badge');
+
+        async function checkHealth() {
+            try {
+                const res = await fetch('http://localhost:5000/health', { signal: AbortSignal.timeout(2000) });
+                if (res.ok) {
+                    statusBadge.className = 'bg-emerald-50 text-emerald-700 text-xs font-semibold px-2.5 py-1 rounded-full border border-emerald-200';
+                    statusBadge.innerText = 'Model Ready';
+                } else {
+                    throw new Error();
+                }
+            } catch {
+                statusBadge.className = 'bg-rose-50 text-rose-600 text-xs font-semibold px-2.5 py-1 rounded-full border border-rose-200';
+                statusBadge.innerText = 'Backend Offline';
+            }
+        }
+
+        checkHealth();
+        setInterval(checkHealth, 5000);
+
         // ── Mode toggle ───────────────────────────────────────────────────────
         let currentMode = 'upload';
         let cameraStream = null;
