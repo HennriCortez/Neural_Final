@@ -1,8 +1,10 @@
 flask
 flask-cors
+requests
 Pillow
-torchvision
-transformers
+numpy<2.0
+torchvision==0.17.2
+transformers==4.46.0
 opencv-python-headless
 --find-links https://download.pytorch.org/whl/cpu/torch_stable.html
-torch --index-url https://download.pytorch.org/whl/cpu
+torch==2.2.2 --index-url https://download.pytorch.org/whl/cpu
